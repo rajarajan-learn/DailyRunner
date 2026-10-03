@@ -36,6 +36,15 @@ c0=$(ver claude); u0=$(ver uv); x0=$(ver codex)
 
 step claude
 claude update
+sbx_out=""
+while read -r -u 4 s st; do
+  step "sbx $s ($st)"
+  b=$(sbx exec "$s" claude --version | head -1 || echo "?")   # exec starts a stopped sandbox
+  sbx exec "$s" claude update || true
+  a=$(sbx exec "$s" claude --version | head -1 || echo "?")
+  [ "$st" != running ] && { sbx stop "$s" || true; }
+  [ "$b" != "$a" ] && sbx_out+="sbx     $s: $b -> $a"$'\n' || sbx_out+="sbx     $s: $a (no change)"$'\n'
+done 4< <(sbx ls --json | jq -r '.sandboxes[] | select(.agent=="claude") | "\(.name) \(.status)"')
 step codex
 curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh
 step uv
@@ -57,6 +66,7 @@ say "--- $(date '+%F %T') ---"
 [ "$c0" != "$c1" ] && say "claude  $c0 -> $c1" || say "claude  $c1 (no change)"
 [ "$u0" != "$u1" ] && say "uv      $u0 -> $u1" || say "uv      $u1 (no change)"
 [ "$x0" != "$x1" ] && say "codex   $x0 -> $x1" || say "codex   $x1 (no change)"
+[ -n "$sbx_out" ] && say "${sbx_out%$'\n'}" || true
 if [ -n "$snaps" ]; then
   say "snap    $(wc -l <<<"$snaps") refreshed:"
   say "$(sed 's/^/          /' <<<"$snaps")"
